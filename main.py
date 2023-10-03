@@ -1,6 +1,5 @@
 import base64
 import io
-
 import dash
 from dash import dash_table
 import pandas as pd
@@ -8,11 +7,11 @@ from dash import html
 from dash import dcc
 from dash.dependencies import Input, Output, State
 
-
 app = dash.Dash(__name__)
 
-app.layout = html.Div([
-    html.H1("Загрузка и отображение CSV файлов", style={'text-align': 'center'}),
+# Определение макета страницы загрузки файлов
+upload_layout = html.Div([
+    # html.H1("Загрузка CSV файлов", style={'text-align': 'center'}),
     html.Div([
         dcc.Upload(
             id='upload-courses',
@@ -73,12 +72,53 @@ app.layout = html.Div([
                'flex-direction': 'row',
                'flex-wrap': 'nowrap',
                'justify-content': 'space-around'
-               }),
+               })
+])
 
+# Определение макета страницы отображения таблиц
+table_layout = html.Div([
+    # html.H1("Отображение CSV файлов", style={'text-align': 'center'}),
     html.Div(id='output-courses'),
     html.Div(id='output-users'),
     html.Div(id='output-ratings')
 ])
+
+# Определение макета страницы "О приложении"
+about_layout = html.Div([
+    # html.H1("О приложении", style={'text-align': 'center'}),
+    html.P("Это веб-приложение для загрузки и отображения CSV файлов."),
+    html.P("Вы можете загрузить файлы курсов, пользователей и рейтингов, и они будут отображены в виде таблиц на странице 'Отображение CSV файлов'."),
+    html.P("Автор: Иван Иванов")
+])
+
+algo1_layout = html.Div([
+    # html.H1("О приложении", style={'text-align': 'center'}),
+    html.P("Демонстрация алгоритма 'User-based Collaborative filtering'"),
+
+])
+
+
+# Определение макета приложения
+app.layout = html.Div([
+    dcc.Tabs(id='tabs', value='upload', children=[
+        dcc.Tab(label='Загрузка файлов', value='upload', children=[upload_layout]),
+        dcc.Tab(label='Отображение файлов', value='table', children=[table_layout]),
+        dcc.Tab(label='Алгоритм 1', value='alg1', children=[algo1_layout]),
+        dcc.Tab(label='О приложении', value='about', children=[about_layout])
+    ]),
+    html.Div(id='page-content')
+])
+
+# Обработчики событий изменения URL
+# @app.callback(Output('page-content', 'children'),
+#               Input('tabs', 'value'))
+# def render_page(tab):
+#     if tab == 'upload':
+#         return upload_layout
+#     elif tab == 'table':
+#         return table_layout
+#     elif tab == 'about':
+#         return about_layout
 
 # Функции обработки загрузки файлов и сохранения их в переменные
 def parse_contents(contents, filename):
@@ -115,6 +155,7 @@ def parse_contents(contents, filename):
             'Произошла ошибка при обработке файла.'
         ])
 
+
 # Обработчики событий загрузки файлов
 @app.callback(Output('output-courses', 'children'),
               Input('upload-courses', 'contents'),
@@ -125,6 +166,7 @@ def update_output_courses(content, filename):
     else:
         return None
 
+
 @app.callback(Output('output-users', 'children'),
               Input('upload-users', 'contents'),
               State('upload-users', 'filename'))
@@ -134,6 +176,7 @@ def update_output_users(content, filename):
     else:
         return None
 
+
 @app.callback(Output('output-ratings', 'children'),
               Input('upload-ratings', 'contents'),
               State('upload-ratings', 'filename'))
@@ -142,6 +185,7 @@ def update_output_ratings(content, filename):
         return parse_contents(content, filename)
     else:
         return None
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
