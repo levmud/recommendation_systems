@@ -6,8 +6,13 @@ import pandas as pd
 from dash import html
 from dash import dcc
 from dash.dependencies import Input, Output, State
+import algorithms
 
 app = dash.Dash(__name__)
+
+courses_np = None
+users_np = None
+ratings_np = None
 
 # Определение макета страницы загрузки файлов
 upload_layout = html.Div([
@@ -68,16 +73,13 @@ upload_layout = html.Div([
             multiple=False
         )
     ],
+
         style={'display': 'flex',
                'flex-direction': 'row',
                'flex-wrap': 'nowrap',
                'justify-content': 'space-around'
-               })
-])
+               }),
 
-# Определение макета страницы отображения таблиц
-table_layout = html.Div([
-    # html.H1("Отображение CSV файлов", style={'text-align': 'center'}),
     html.Div(id='output-courses'),
     html.Div(id='output-users'),
     html.Div(id='output-ratings')
@@ -94,31 +96,28 @@ about_layout = html.Div([
 algo1_layout = html.Div([
     # html.H1("О приложении", style={'text-align': 'center'}),
     html.P("Демонстрация алгоритма 'User-based Collaborative filtering'"),
-
+    html.Div(id='output-ratings1'),
+    html.Div(id='output-predicted-ratings_1')
 ])
 
+algo2_layout = html.Div([
+    html.P("Демонстрация алгоритма 'Item-based Collaborative filtering'"),
+    html.Div(id='output-ratings2'),
+    html.Div(id='output-predicted-ratings_2')
+
+])
 
 # Определение макета приложения
 app.layout = html.Div([
     dcc.Tabs(id='tabs', value='upload', children=[
         dcc.Tab(label='Загрузка файлов', value='upload', children=[upload_layout]),
-        dcc.Tab(label='Отображение файлов', value='table', children=[table_layout]),
         dcc.Tab(label='Алгоритм 1', value='alg1', children=[algo1_layout]),
+        dcc.Tab(label='Алгоритм 2', value='alg2', children=[algo2_layout]),
         dcc.Tab(label='О приложении', value='about', children=[about_layout])
     ]),
     html.Div(id='page-content')
 ])
 
-# Обработчики событий изменения URL
-# @app.callback(Output('page-content', 'children'),
-#               Input('tabs', 'value'))
-# def render_page(tab):
-#     if tab == 'upload':
-#         return upload_layout
-#     elif tab == 'table':
-#         return table_layout
-#     elif tab == 'about':
-#         return about_layout
 
 # Функции обработки загрузки файлов и сохранения их в переменные
 def parse_contents(contents, filename):
@@ -129,15 +128,32 @@ def parse_contents(contents, filename):
         if 'csv' in filename:
             # Загрузить содержимое файла в DataFrame
             df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=';')
-            # Отсортировать DataFrame по столбцам
-            df_sorted = df.sort_values(by=df.columns[0])
+            # Преобразовать DataFrame в numpy массив
+            np_array = df.to_numpy()
+
+            # Сохранить массив в соответствующую переменную
+            if 'courses' in filename:
+                global courses_np
+                courses_np = np_array
+            elif 'users' in filename:
+                global users_np
+                users_np = np_array
+            elif 'rat' in filename:
+                global ratings_np
+                ratings_np = np_array
+
+            print('courses=', courses_np)
+            print('users=', users_np)
+            print('ratings=', ratings_np)
+
+
 
             # Отобразить DataFrame в виде таблицы
             return html.Div([
                 html.H5(filename),
                 dash_table.DataTable(
-                    data=df_sorted.to_dict('records'),
-                    columns=[{'name': i, 'id': i} for i in df_sorted.columns],
+                    data=df.to_dict('records'),
+                    columns=[{'name': i, 'id': i} for i in df.columns],
                     sort_action='native',
                     sort_mode='multi',
                     filter_action='native',
@@ -154,6 +170,46 @@ def parse_contents(contents, filename):
         return html.Div([
             'Произошла ошибка при обработке файла.'
         ])
+
+
+# Функция обработки загрузки файла рейтингов и расчета предсказанных рейтингов
+@app.callback(Output('output-predicted-ratings_1', 'children'),
+              Input('upload-ratings', 'contents'),
+              State('upload-ratings', 'filename'))
+def update_output_predicted_ratings(content, filename):
+    if ratings_np is not None:
+        predicted_ratings = algorithms.user.predict_ratings(ratings_np, 3)
+        table = []
+        for i, user in enumerate(predicted_ratings):
+            table.append(f'Predicted ratings for User{i + 1}: {user}')
+        print('Вызов предикта')
+        # Отобразить предсказанные рейтинги в виде таблицы
+        return html.Div([
+            html.H5('Предсказанные рейтинги'),
+            html.Div([
+                html.P(s) for s in table])
+        ])
+    else:
+        return None
+
+@app.callback(Output('output-predicted-ratings_2', 'children'),
+              Input('upload-ratings', 'contents'),
+              State('upload-ratings', 'filename'))
+def update_output_predicted_ratings(content, filename):
+    if ratings_np is not None:
+        predicted_ratings = algorithms.item.predict_ratings_item(ratings_np, 3)
+        table = []
+        for i, user in enumerate(predicted_ratings):
+            table.append(f'Predicted ratings for User{i + 1}: {user}')
+        print('Вызов предикта')
+        # Отобразить предсказанные рейтинги в виде таблицы
+        return html.Div([
+            html.H5('Предсказанные рейтинги'),
+            html.Div([
+                html.P(s) for s in table])
+        ])
+    else:
+        return None
 
 
 # Обработчики событий загрузки файлов
@@ -181,6 +237,24 @@ def update_output_users(content, filename):
               Input('upload-ratings', 'contents'),
               State('upload-ratings', 'filename'))
 def update_output_ratings(content, filename):
+    if content is not None:
+        return parse_contents(content, filename)
+    else:
+        return None
+
+@app.callback(Output('output-ratings1', 'children'),
+              Input('upload-ratings', 'contents'),
+              State('upload-ratings', 'filename'))
+def update_output_ratings2(content, filename):
+    if content is not None:
+        return parse_contents(content, filename)
+    else:
+        return None
+
+@app.callback(Output('output-ratings2', 'children'),
+              Input('upload-ratings', 'contents'),
+              State('upload-ratings', 'filename'))
+def update_output_ratings2(content, filename):
     if content is not None:
         return parse_contents(content, filename)
     else:
